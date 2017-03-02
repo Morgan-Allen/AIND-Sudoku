@@ -100,12 +100,26 @@ def only_choice(values):
 #  TODO:  In principle, this could be extended to any arbitrary number of
 #  digits- triplets, quadruplets, quintuplets, etc.
 
+
 def naked_twins(values):
     """Eliminate values using the naked twins strategy.
     Args:
         values(dict): a dictionary of the form {'box_name': '123456789', ...}
     Returns:
         the values dictionary with the naked twins eliminated from peers in
+        the same unit.
+    """
+    return naked_matches(values, 2)
+
+
+def naked_matches(values, arity):
+    """Eliminate values using the naked matches strategy.
+    Args:
+        values(dict): a dictionary of the form {'box_name': '123456789', ...}
+        arity(int): specifies the size of match- twins, triplets, quadruplets,
+                    etc.  May be -1 to allow for any possible match.
+    Returns:
+        the values dictionary with any naked matches eliminated from peers in
         the same unit.
     """
     
@@ -118,8 +132,13 @@ def naked_twins(values):
         unit_twins = []
         for box in unit:
             matches = [other for other in unit if values[other] == values[box]]
-            if len(values[matches[0]]) == len(matches) and len(matches) == 2:
-                unit_twins.extend(matches)
+            if len(matches) == 1:
+                continue
+            if arity > 0 and len(matches) != arity:
+                continue
+            if len(values[matches[0]]) != len(matches):
+                continue
+            unit_twins.extend(matches)
         if len(unit_twins) > 0:
             unit_twins.append(unit)
             twin_lists.append(unit_twins)
@@ -194,8 +213,8 @@ def reduce_puzzle(values):
         # Use the Only Choice Strategy
         only_choice(values)
         
-        # Use the Naked Twins Strategy
-        naked_twins(values)
+        # Use the Naked Matches Strategy
+        naked_matches(values, -1)
         
         # Use the Subgroup Exclusion Strategy
         subgroup_exclusion(values)
