@@ -5,18 +5,16 @@ cols = '123456789'
 def cross(a, b):
     return [s+t for s in a for t in b]
 
-def diag(a, b):
-    return [a[n]+b[n] for n in range(len(a))]
-
 boxes          = cross(rows, cols)
 row_units      = [cross(r   , cols) for r  in rows]
 column_units   = [cross(rows, c   ) for c  in cols]
 square_units   = [cross(rs  , cs  ) for rs in ('ABC','DEF','GHI') for cs in ('123','456','789')]
-diagonal_units = [diag(rows, c) for c in (cols, '987654321')]
+diagonal_units = [[a[0]+a[1] for a in zip(rows, c)] for c in (cols, cols[::-1])]
 unitlist       = row_units + column_units + square_units + diagonal_units
 units          = dict((s, [u for u in unitlist if s in u]) for s in boxes)
 peers          = dict((s, set(sum(units[s],[]))-set([s])) for s in boxes)
 
+search_limit = [-1]
 assignments = []
 
 
@@ -99,8 +97,8 @@ def only_choice(values):
     return values
 
 
-#  TODO:  In principle, this could be extended to any arbitrary set of N
-#  digits.
+#  TODO:  In principle, this could be extended to any arbitrary number of
+#  digits- triplets, quadruplets, quintuplets, etc.
 
 def naked_twins(values):
     """Eliminate values using the naked twins strategy.
@@ -140,10 +138,41 @@ def naked_twins(values):
     return values
 
 
-#  TODO:  Add the sub-group exclusion rule (i.e, if the possible boxes for
-#  a given digit within unit A have been narrowed to the point where they all
-#  fit within another unit B, then that digit can be stripped from all other
-#  boxes in unit B.)
+def subgroup_exclusion(values):
+    """Eliminate values using the subgroup exclusion strategy.
+    Args:
+        values(dict): a dictionary of the form {'box_name': '123456789', ...}
+    Returns:
+        the values dictionary with any constrained digits excluded from a
+        units that share the same subgroup.
+    """
+    
+    #  Firstly, for every digit and unit, find the subgroup of boxes in which
+    #  that digit can still appear.  If this subgroup belongs to another unit,
+    #  record that other unit.
+    scrub_units = []
+    
+    for unit in unitlist:
+        for digit in '123456789':
+            possibles = set([box for box in unit if digit in values[box]])
+            if len(possibles) == 1:
+                continue
+            for other in unitlist:
+                matches = [box for box in possibles if other in units[box]]
+                if other != unit and len(possibles) == len(matches):
+                    record = [digit, set(other) - possibles]
+                    scrub_units.append(record)
+    
+    #  For each such unit, eliminate that digit from all *other* boxes in that
+    #  *other* unit.
+    for record in scrub_units:
+        digit = record[0]
+        to_scrub = record[1]
+        for box in to_scrub:
+            assign_value(values, box, values[box].replace(digit, ''))
+    
+    return values
+
 
 def reduce_puzzle(values):
     """Uses a variety of simpler strategies to reduce or fix values within
@@ -167,6 +196,9 @@ def reduce_puzzle(values):
         
         # Use the Naked Twins Strategy
         naked_twins(values)
+        
+        # Use the Subgroup Exclusion Strategy
+        subgroup_exclusion(values)
 
         # Check how many boxes have a determined value after-
         solved_values_after = len([box for box in values.keys() if len(values[box]) == 1])
@@ -199,6 +231,13 @@ def search(values):
     # First, reduce the puzzle using the previous function
     
     result = reduce_puzzle(values)
+    
+    if search_limit[0] > 0:
+        display(values)
+        search_limit[0] -= 1
+        if search_limit[0] == 0:
+            return values
+    
     if result == False:
         return False
     
@@ -244,25 +283,39 @@ def solve(grid):
     
 
 if __name__ == '__main__':
+    
+    print("Testing subgroup exclusion...")
+    grid = '';
+    grid+='9........'
+    grid+='8........'
+    grid+='7........'
+    grid+='6........'
+    grid+='5........'
+    grid+='4........'
+    grid+='.........'
+    grid+='.........'
+    grid+='.........'
+    
+    values = grid_values(grid)
+    values = subgroup_exclusion(values)
+    display(values)
+    
+    print("Testing single search iteration...")
+    search_limit[0] = 1
+    solve(grid)
+    
+    print("Testing proper soduku solution:")
     diag_sudoku_grid = '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
     display(solve(diag_sudoku_grid))
-
+    
     try:
         from visualize import visualize_assignments
         visualize_assignments(assignments)
-
+    
     except SystemExit:
         pass
     except:
         print('We could not visualize your board due to a pygame issue. Not a problem! It is not a requirement.')
-
-
-
-
-
-
-
-
 
 
 
